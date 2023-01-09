@@ -151,7 +151,7 @@ public class HelloApplication extends Application {
         stage.show();
 
 
-
+        Huffman huf = new Huffman();
 
         compressB.setOnAction(e -> {
             try {
@@ -175,7 +175,6 @@ public class HelloApplication extends Application {
                     alert.show();
 
                 } else {
-                    Huffman huf = new Huffman();
                     huf.compressFile(selectedFile.getAbsolutePath());
                     showCB.setDisable(false);
                     compressTF.setText(selectedFile.getAbsolutePath());
@@ -186,6 +185,13 @@ public class HelloApplication extends Application {
             }
         });
 
+        showCB.setOnAction(e -> {
+            Alert a = new Alert(Alert.AlertType.INFORMATION);
+            a.setHeaderText(huf.getPreStat());
+            a.setTitle("Compression statistics");
+            a.setContentText("MohammadF all rights are reserved");
+            a.show();
+        });
 
         deCompressB.setOnAction(e -> {
             try {
@@ -209,7 +215,7 @@ public class HelloApplication extends Application {
                     alert.show();
 
                 } else {
-                    Huffman huf = new Huffman();
+
                     huf.deCompressFile(selectedFile.getAbsolutePath());
                     deShowCB.setDisable(false);
                     deCompressTF.setText(selectedFile.getAbsolutePath());

@@ -4,8 +4,8 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
 import java.io.*;
-import java.math.BigInteger;
 import java.nio.channels.FileChannel;
+import java.text.DecimalFormat;
 import java.util.*;
 
 public class Huffman {
@@ -22,21 +22,35 @@ public class Huffman {
 
     ObservableList<TableViewer> tableViewers = FXCollections.observableArrayList();
 
+    private String preStat="";
+    private String postStat="";
+
     private int sum = 0;
 
     public void compressFile(String filePath) throws IOException {
+
 
         System.out.println("Compressing");
 
         FileInputStream in = new FileInputStream(filePath);
 
+        FileChannel channel = in.getChannel();
+
+        preStat += "Old file size: " + channel.size()/1024 + "Kbyts\n";
+
         BufferedInputStream inp = new BufferedInputStream(new FileInputStream(filePath));
 
-        byte[] data = new byte[in.available()];
+        byte[] buffer = new byte[1024 * 8];
 
-        inp.read(data);
+        while((inp.read(buffer)) != -1) {
 
-        getFileData(data);
+            getFileData(buffer);
+
+        }
+
+        //byte[] data = new byte[in.available()];
+
+        //inp.read(data);
 
         inp.close();
 
@@ -44,11 +58,11 @@ public class Huffman {
 
         getHuffmanCodes(root, new StringBuilder());
 
-        compress(filePath);
+        compress(filePath, channel.size());
 
     } // public method to call (Compress a file)
 
-    private void compress(String filepath) throws IOException {
+    private void compress(String filepath, long size) throws IOException {
 
         String fileName = new File(filepath).getName();
         String fileExtension = "";
@@ -68,19 +82,41 @@ public class Huffman {
         System.out.println(newFilePath);
 
         BufferedOutputStream outB = new BufferedOutputStream(new FileOutputStream(newFilePath));
+
         writeHeader(fileExtension, filepath, newFilePath);
 
         outB.close();
 
-        StringBuilder encoded = new StringBuilder();
+        StringBuilder encoded;
 
         BitOutputStream bitOutputStream = new BitOutputStream(newFilePath);
 
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(filepath));
 
+        //byte[] data = new byte[in.available()];
 
-        byte[] data = new byte[in.available()];
+        byte[] buffer = new byte[1024 * 8];
 
+        while ((in.read(buffer)) != -1) {
+            encoded = new StringBuilder();
+            for (byte b : buffer) {
+                encoded.append(codes[b & 0xFF]);
+
+                String code = codes[b & 0xFF];
+
+                for (int j = 0; j < code.length(); j++) {
+                    char c = code.charAt(j);
+                    if (c == '0') {
+                        bitOutputStream.writeBit(0);
+                    } else {
+                        bitOutputStream.writeBit(1);
+                    }
+                }
+            }
+
+        }
+
+        /*
         in.read(data);
 
         for (byte b : data) {
@@ -97,6 +133,7 @@ public class Huffman {
                 }
             }
         }
+        */
 
         System.out.println("Writing on file");
 
@@ -108,6 +145,12 @@ public class Huffman {
 
         //outB.write(bytes);
         System.out.println("Done");
+
+        FileInputStream inp = new FileInputStream(newFilePath);
+
+        FileChannel channel = inp.getChannel();
+
+        preStat += "New file size: " + channel.size()/1024 + "Kbyts\nthe effectiveness: " + String.format("%.2f", (( (double) channel.size()/size) * 100)) + "%\nThe number of different bytes: " + specialBytes.size();
 
         bitOutputStream.close();
 
@@ -161,10 +204,9 @@ public class Huffman {
 
     private void getFileData(byte[] data) {
 
-
         for (byte b : data) {
             if(( b & 0xFF) == 0) {
-                System.out.println("NULL");
+                //System.out.println("NULL");
             }
             if(charFreqs[b & 0xFF] == 0) {
                 specialBytes.add(b);
@@ -177,11 +219,11 @@ public class Huffman {
     private void processTheQueue() {
 
         for (int i = 0; i < specialBytes.size(); i++) {
-            if(charFreqs[specialBytes.get(i) & 0xFF] > 0) {
-                sum += charFreqs[specialBytes.get(i) & 0xFF]; //
-                queue.add(new HuffmanNode (specialBytes.get(i), charFreqs[specialBytes.get(i) & 0xFF], null, null));
-                //tableViewers.add(new TableViewer(specialBytes.get(i), charFreqs[specialBytes.get(i) & 0xFF], codes[specialBytes.get(i) & 0xFF]));
-            }
+
+            sum += charFreqs[specialBytes.get(i) & 0xFF]; //
+            queue.add(new HuffmanNode (specialBytes.get(i), charFreqs[specialBytes.get(i) & 0xFF], null, null));
+            tableViewers.add(new TableViewer(specialBytes.get(i), charFreqs[specialBytes.get(i) & 0xFF], codes[specialBytes.get(i) & 0xFF]));
+
         }
 
 
@@ -229,11 +271,11 @@ public class Huffman {
                     tableViewers.add(new TableViewer(left.data, left.frequency, codes[left.data & 0xFF]));
                     tableViewers.add(new TableViewer(right.data, right.frequency, codes[right.data & 0xFF]));
                     queue.add(new HuffmanNode(left.data, (left.frequency + right.frequency), left, right));
-                    System.out.println("Has right and left");
+                    //System.out.println("Has right and left");
                 } catch (Exception e) {
                     tableViewers.add(new TableViewer(left.data, left.frequency, codes[left.data & 0xFF]));
                     queue.add(new HuffmanNode(left.data, (left.frequency + 0), left, null));
-                    System.out.println("Has left");
+                    //System.out.println("Has left");
                 }
             }
 
@@ -255,10 +297,13 @@ public class Huffman {
 
             if(root.left == null & root.right == null) {
                 this.codes[root.data &0xFF] = prefix.toString();
-                System.out.println("byte: " + root.data + " code: " + prefix.toString());
-                System.out.println("Here1");
-                //this.tableViewers.get(root.data &0xFF).setCode(prefix.toString());
-                System.out.println("Here2");
+
+                for (int i = 0; i < tableViewers.size(); i++) {
+                    if(tableViewers.get(i).getData() == root.data) {
+                        tableViewers.get(i).setCode(prefix.toString());
+                    }
+                }
+
                 return;
             }
 
@@ -332,7 +377,9 @@ public class Huffman {
 
             System.out.println(inputStream.available());
 
-            String newFilePath;
+            String newFilePath = "";
+
+            long startTime = System.currentTimeMillis();
 
             while (numBytesRead  != -1) {
                 //System.out.println("bits " +Integer.toBinaryString(buffer[0]));
@@ -351,7 +398,7 @@ public class Huffman {
                     if('\n' == (char) buffer[0]){
                         readingExtension = false;
                         readingOriginalFileSize = true;
-
+                        newFilePath = filePath.replace(".MohammadF", "." + originalExt);
                         System.out.println(originalExt);
                     } else {
                         originalExt += (char) buffer[0];
@@ -373,7 +420,6 @@ public class Huffman {
                     }
                 } else if(readingHead) {
 
-
                     String byteData = "";
                     String byteFreq = "";
 
@@ -386,6 +432,7 @@ public class Huffman {
                             readingData = true;
                             readSize = 1024 * 1024;
                             processTheDeCompressQueue();
+
                             curr = root;
                             System.out.println("switching " + buffer.length);
                             newFilePath = filePath.replace(".MohammadF", "." + originalExt);
@@ -416,14 +463,15 @@ public class Huffman {
                     }
 
                 } else if(readingData) {
-                    //System.out.println("here");
-                    newFilePath = filePath.replace(".MohammadF", "." + originalExt);
+                    readSize = 1024 * 1024;
                     curr = printChunks(buffer, newFilePath, curr);
                 }
 
                 buffer = new byte[readSize];
                 numBytesRead = inputStream.read(buffer);
             }
+
+            System.out.println("Time elapsed: " + ((System.currentTimeMillis() - startTime)/1000) + "'s");
 
             System.out.println("Done");
 
@@ -446,7 +494,6 @@ public class Huffman {
             while (res.length() < 8) {
                 res = "0" + res;
             }
-            //System.out.println(Integer.toBinaryString(data & 0xff));
             for (int j = 0; j < res.length(); j++) {
 
                 if(originalFileSize > alreadyDone) {
@@ -466,6 +513,7 @@ public class Huffman {
                     }
                 }
             }
+
         }
         outB.close();
         return curr;
@@ -514,4 +562,14 @@ public class Huffman {
     public ObservableList<TableViewer> getTableViewers() {
         return tableViewers;
     }
+
+    public String getPreStat() {
+        return preStat;
+    }
+
+    public String getPostStat() {
+        return postStat;
+    }
+
+
 }
